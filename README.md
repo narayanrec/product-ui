@@ -4,7 +4,7 @@ This template provides a minimal setup to get React working in Vite with HMR and
 
 ## Prerequisites
 
-- Node.js `^20.19.0` or `>=22.12.0` (required by Vite 8)
+- Node.js `^20.19.0`, `^22.13.0`, or `>=24` (supported by the project toolchain)
 - npm
 
 ## Build, Test, and Run
@@ -33,7 +33,11 @@ Run the linter:
 npm run lint
 ```
 
-This project does not currently define a dedicated test script.
+Run the unit tests:
+
+```sh
+npm test
+```
 
 Preview the production build locally:
 

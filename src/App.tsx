@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import ProductForm from "./components/ProductForm";
+import ProductList from "./components/ProductList";
+import type { Product } from "./types";
 
-// Define structural layout for a product model mapping
-interface Product {
-  id?: number;
-  name: string;
-}
+const API_URL = "http://localhost:8080/products";
 
 export default function App() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -12,45 +11,50 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const API_URL = "http://localhost:8080/products";
-
-  // 1. Fetch existing data records from your database on component initial load
-  const fetchProducts = async () => {
-    try {
-      setError("");
-      const response = await fetch(API_URL);
-      if (!response.ok) throw new Error("Failed to retrieve items.");
-      const data = await response.json();
-      setProducts(data);
-    } catch (err: any) {
-      setError(err.message || "Server connection offline.");
-    }
-  };
-
-  useEffect(() => {
-    fetchProducts();
+  const fetchProducts = useCallback(async (): Promise<Product[]> => {
+    const response = await fetch(API_URL);
+    if (!response.ok) throw new Error("Failed to retrieve items.");
+    return response.json();
   }, []);
 
-  // 2. Post a fresh product payload back to the database
-  const handleCreateProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProductName.trim()) return;
+  useEffect(() => {
+    let active = true;
+    fetchProducts()
+      .then((data) => {
+        if (!active) return;
+        setProducts(data);
+      })
+      .catch((err: unknown) => {
+        if (active) {
+          setError(
+            err instanceof Error ? err.message : "Server connection offline.",
+          );
+        }
+      });
 
+    return () => {
+      active = false;
+    };
+  }, [fetchProducts]);
+
+  const handleCreateProduct = async (name: string) => {
     setLoading(true);
+    setError("");
     try {
       const response = await fetch(API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newProductName }),
+        body: JSON.stringify({ name }),
       });
 
       if (!response.ok) throw new Error("Failed to create product.");
 
       setNewProductName("");
-      // Refresh list immediately from server data trace
-      fetchProducts();
-    } catch (err: any) {
-      setError(err.message);
+      setProducts(await fetchProducts());
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error ? err.message : "Failed to create product.",
+      );
     } finally {
       setLoading(false);
     }
@@ -76,56 +80,14 @@ export default function App() {
           </div>
         )}
 
-        {/* Product Creation Form */}
-        <form onSubmit={handleCreateProduct} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Product Name
-            </label>
-            <input
-              type="text"
-              value={newProductName}
-              onChange={(e) => setNewProductName(e.target.value)}
-              placeholder="e.g., Mechanical Keyboard"
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:indigo-500 sm:text-sm text-black"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-          >
-            {loading ? "Saving Item..." : "Add Product"}
-          </button>
-        </form>
+        <ProductForm
+          name={newProductName}
+          loading={loading}
+          onNameChange={setNewProductName}
+          onCreate={handleCreateProduct}
+        />
 
-        {/* Dynamic Display Grid Matrix List */}
-        <div className="space-y-4 pt-4 border-t border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Current Inventory ({products.length})
-          </h2>
-          {products.length === 0 ? (
-            <p className="text-sm text-gray-400 italic text-center py-4">
-              No inventory items tracked yet.
-            </p>
-          ) : (
-            <ul className="divide-y divide-gray-100 max-h-64 overflow-y-auto pr-1">
-              {products.map((product) => (
-                <li
-                  key={product.id}
-                  className="py-3 flex justify-between items-center text-sm"
-                >
-                  <span className="font-medium text-gray-800">
-                    {product.name}
-                  </span>
-                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
-                    ID: {product.id}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+        <ProductList products={products} />
       </div>
     </div>
   );
